@@ -1,0 +1,10 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {demoOrigin,distanceKm,findRestaurants} from './search.js';
+const restaurants=[{id:1,lat:52.231,lon:21.014,menu:[{name:'Carbonara',price:39}]},{id:2,lat:52.237,lon:21.019,menu:[{name:'Carbonara',price:42}]},{id:3,lat:52.218,lon:21.006,menu:[{name:'Carbonara',price:35}]}];
+const search=(q,o,options)=>findRestaurants(q,o,options,restaurants);
+test('carbonara: tylko lokale z daniem, od najbliższego',()=>{const r=search('CARBONARA',demoOrigin);assert.equal(r.length,3);assert.equal(r[0].id,1);assert.ok(r.every((x,i)=>!i||r[i-1].distance<=x.distance));});
+test('filtry ceny i promienia',()=>{assert.deepEqual(search('carbonara',demoOrigin,{budget:40,radius:1}).map(r=>r.id),[1]);});
+test('zmiana lokalizacji zmienia najbliższy lokal',()=>{assert.equal(search('carbonara',{lat:52.218,lon:21.006})[0].id,3);});
+test('brak dania lub zapytania',()=>{assert.deepEqual(search('sushi',demoOrigin),[]);assert.deepEqual(search(' ',demoOrigin),[]);});
+test('odległość w znanych punktach',()=>{assert.equal(distanceKm(demoOrigin,demoOrigin),0);assert.ok(Math.abs(distanceKm({lat:0,lon:0},{lat:1,lon:0})-111.195)<.01);});

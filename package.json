@@ -1,0 +1,21 @@
+{
+  "name": "na-zab",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "vite --host 127.0.0.1 --configLoader native",
+    "build": "vite build --configLoader native",
+    "test": "node --test",
+    "preview": "vite preview --host 127.0.0.1 --configLoader native"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tesseract.js": "^6.0.1"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0"
+  }
+}
