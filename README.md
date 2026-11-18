@@ -1,20 +1,39 @@
-﻿# Gdzie zjeść?
+# GdzieZjem? 🍝 · Wyszukiwarka dań na żywo
+> Projekt na ogólnopolski konkurs programistyczny **„Złota Apka – Code with Calisia”**
 
-Aplikacja wyszukuje restauracje i lokale gastronomiczne w pobliżu wskazanej miejscowości, dokładnego adresu lub bieżącej lokalizacji. Wybierz promień 2, 5 albo 10 km. Wyniki pochodzą z OpenStreetMap i są sortowane według odległości w linii prostej.
+Aplikacja rozwiązuje codzienny problem: **„Mam ochotę na konkretne danie (np. carbonara, ramen, burger, pierogi) – gdzie zjem je najbliżej i jak tam dotrzeć?”**
 
-## Uruchomienie
+Działa w **100% w czasie rzeczywistym (live)**, bez konieczności utrzymywania własnej bazy danych SQL czy ręcznego wprowadzania lokali.
 
-Wymagany Node.js 22.12+ lub 24:
+---
+
+## 🚀 Jak to działa?
+
+1. **Wyszukiwanie dań (Dish-First UX):** Użytkownik wpisuje w pole wyszukiwania dowolną potrawę (np. `carbonara`, `ramen`, `kebab`, `schabowy`, `pad thai`, `sushi`, `naleśniki` itp.) lub wybiera z szybkich propozycji.
+2. **Silnik klasyfikacji kulinarnej w locie (`dishKnowledge.js`):** Aplikacja w ułamku sekundy analizuje profil potrawy, dobiera odpowiednie tagi kuchni oraz słowa kluczowe.
+3. **Pobieranie na żywo z OpenStreetMap (Overpass API):** Aplikacja wyszukuje lokale gastronomiczne w wybranym promieniu (2, 5, 10 lub 15 km) od podanego punktu.
+4. **Punktacja i inteligentne sortowanie:** Lokale o profilu odpowiadającym potrawie (np. trattorie i restauracje włoskie dla carbonary) otrzymują wyróżnienie i są sortowane od najbliższego w metrach wraz z szacowanym czasem dojścia pieszo.
+5. **Akcje jednym kliknięciem:**
+   - 📖 **Sprawdź danie w menu (Google Maps):** Bezpośredni dynamiczny link do karty dań, recenzji i zdjęć wpisanej potrawy w tym lokalu.
+   - 🧭 **Prowadź do lokalu:** Uruchomienie nawigacji pieszej/samochodowej.
+   - 🌐 **Strona WWW:** Bezpośrednie przejście do oficjalnej witryny lokalu.
+
+---
+
+## 🛠️ Uruchomienie lokalne
+
+Wymagany Node.js (wersja 20, 22 lub 24):
 
 ```powershell
-npm.cmd install
-npm.cmd start
+npm install
+npm start
 ```
 
-Otwórz adres pokazany w terminalu. API wyszukiwania działa przez middleware Vite, więc katalog `dist` samodzielnie nie wystarcza do wdrożenia. Do publikacji potrzebny będzie serwer z obsługą endpointu `/api/nearby`.
+Otwórz adres w przeglądarce: [http://localhost:5173](http://localhost:5173).
 
-## Lokalizacja i dane
+---
 
-Podpowiedzi miejscowości pochodzą z Open-Meteo / GeoNames, a wyszukiwanie dokładnego adresu korzysta z Photon i danych OpenStreetMap. Wyniki lokali są pobierane z Overpass API. Ręcznie wybrana miejscowość oznacza centrum miejscowości; adres wskazuje wybrany punkt. Geolokalizacja przeglądarki wymaga localhost lub HTTPS.
+## 🏛️ Dedykowany tryb demonstracyjny (Kalisz)
 
-Dane OpenStreetMap mogą być niepełne lub nieaktualne. Nazwy, adresy i kategorie zależą od wpisów mapowych; aplikacja nie udostępnia menu ani ocen lokali. Przy wynikach widoczna jest atrybucja OpenStreetMap.
+Aplikacja domyślnie startuje z widokiem na Główny Rynek w **Kaliszu** (stolicy konkursu *Code with Calisia*), z wbudowanym zabezpieczeniem buforującym na wypadek problemów z siecią zewnętrzną serwerów map podczas prezentacji przed jury.
+Można również użyć **własnej geolokalizacji GPS** lub wpisać dowolną miejscowość i adres w Polsce.

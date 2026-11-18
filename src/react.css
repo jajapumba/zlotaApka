@@ -6,3 +6,182 @@
 .radius-picker{margin-top:24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}.radius-picker>span{font-size:13px;font-weight:600}.radius-picker>div{display:flex;gap:8px}.radius-picker button{padding:10px 20px;border:1px solid #dce1d3;background:white;color:#304e39;border-radius:22px}.radius-picker button.selected{background:#304e39;color:white;border-color:#304e39}.radius-picker button:disabled{opacity:.55}.restaurant-content>a{font-size:13px;color:#304e39}.menu-import{display:none!important}
 .map-credit{margin-top:20px;font-size:11px;color:#6c7765}.map-credit a{color:inherit}
 .address-location>input{width:100%;max-width:680px;padding:13px 15px;border:1px solid #dce1d3;border-radius:10px;background:#fafbf7;color:#25372c;font:inherit}.address-location .place-options{max-width:760px}.address-location .place-name{display:flex;flex-direction:column;white-space:normal!important}.address-location .place-name small{white-space:normal;color:#63705f;font-size:11px}@media(max-width:540px){.address-location>input{box-sizing:border-box}}
+
+
+/* Style wyszukiwarki potraw i kart wyników (Code with Calisia) */
+.selected-dish-chip {
+  background: #304e39 !important;
+  color: white !important;
+  font-weight: 700;
+}
+
+.matched-card {
+  border-color: #ec7148 !important;
+  background: #fffdfc !important;
+  box-shadow: 0 4px 18px rgba(236, 113, 72, 0.12);
+}
+
+.matched-card .restaurant-art {
+  background: #fcefe9 !important;
+}
+
+.highlight-badge {
+  background: #fbeee8;
+  color: #cf5227 !important;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-weight: 800 !important;
+}
+
+.dish-match-box {
+  margin: 10px 0 16px;
+  background: #f6f7f2;
+  border-left: 3px solid #304e39;
+  padding: 8px 12px;
+  border-radius: 0 8px 8px 0;
+}
+
+.matched-card .dish-match-box {
+  background: #fbf5ef;
+  border-left-color: #ec7148;
+}
+
+.dish-reason {
+  font-size: 13px;
+  font-weight: 600;
+  color: #3b4d3e;
+}
+
+.matched-card .dish-reason {
+  color: #9c3f1f;
+}
+
+.card-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.action-btn {
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.menu-btn {
+  background: #304e39;
+  color: white !important;
+}
+
+.menu-btn:hover {
+  background: #233b2a;
+}
+
+.dir-btn {
+  background: #edf1e6;
+  color: #304e39 !important;
+  border: 1px solid #d4dcce;
+}
+
+.dir-btn:hover {
+  background: #e1e7d8;
+}
+
+.web-btn {
+  background: transparent;
+  color: #61705d !important;
+  border: 1px solid #dce1d3;
+}
+
+.web-btn:hover {
+  background: #f2f4ec;
+}
+
+.filter-match-toggle {
+  background: #edf1e6;
+  border: 1px solid #ccd4c4;
+  color: #304e39;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.filter-match-toggle.active {
+  background: #ec7148;
+  color: white;
+  border-color: #ec7148;
+}
+
+@media (max-width: 600px) {
+  .card-actions {
+    flex-direction: column;
+  }
+  .action-btn {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+
+/* Sekcja prezentacji konkretnego dania w karcie lokalu */
+.dish-showcase {
+  background: #fdfaf6;
+  border: 1px solid #fae2d5;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 12px 0;
+}
+
+.dish-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.dish-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #25372c;
+}
+
+.dish-price {
+  font-size: 15px;
+  font-weight: 800;
+  color: #cf5227;
+  background: #feece3;
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.dish-ingredients {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #637060;
+  margin: 0 0 8px;
+}
+
+.dish-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dish-tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  background: #edf1e7;
+  color: #3b503e;
+  padding: 3px 8px;
+  border-radius: 5px;
+}
