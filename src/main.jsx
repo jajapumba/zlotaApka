@@ -1,6 +1,5 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
-import ManualLocation from './ManualLocation.jsx';
 import AddressLocation from './AddressLocation.jsx';
 import { POPULAR_DISHES } from './dishKnowledge.js';
 import { analyzeDishQuery, qualifyRestaurantForDish } from './dishEngine.js';
@@ -17,32 +16,42 @@ function estimateWalkTime(distanceKm) {
 }
 
 function App() {
-  const [dishInput, setDishInput] = useState('carbonara');
-  const [activeDish, setActiveDish] = useState('');
+  const [activeDish, setActiveDish] = useState('Carbonara');
   const [origin, setOrigin] = useState(null);
   const [locationName, setLocationName] = useState('');
   const [radius, setRadius] = useState(5);
   const [rawRestaurants, setRawRestaurants] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [dotCount, setDotCount] = useState(0);
   const [error, setError] = useState('');
-  const [manualOpen, setManualOpen] = useState(false);
-  const [addressOpen, setAddressOpen] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [showAllNearby, setShowAllNearby] = useState(false);
 
-  // Referencja do ostatniego punktu geograficznego (aby wiedzieć, czy punkt uległ zmianie)
   const lastPointRef = useRef(null);
 
-  // Analiza potrawy w locie
-  const dishAnalysis = useMemo(() => analyzeDishQuery(activeDish || dishInput), [activeDish, dishInput]);
+  // Animacja kropeczek: 0 -> 1 -> 2 -> 3 -> 0 -> 1 -> 2 -> 3 ...
+  useEffect(() => {
+    if (!loading) return;
+    const interval = setInterval(() => {
+      setDotCount(prev => (prev + 1) % 4);
+    }, 400);
+    return () => clearInterval(interval);
+  }, [loading]);
 
-  // Pobieranie restauracji z API z zachowywaniem i kumulowaniem lokali z mniejszych promieni
-  async function fetchNearby(point, range = radius, isNewLocation = false) {
+  const animatedDots = '.'.repeat(dotCount);
+
+  // Analiza potrawy w locie
+  const dishAnalysis = useMemo(() => analyzeDishQuery(activeDish), [activeDish]);
+
+  // Pobieranie restauracji z OpenStreetMap na żywo
+  async function fetchNearby(point, range = radius, dish = activeDish, isNewLocation = false) {
     if (!point || !Number.isFinite(point.lat) || !Number.isFinite(point.lon)) {
-      setError('Wybierz najpierw lokalizację.');
+      setError('Podaj najpierw adres lub miejscowość w polu powyżej.');
       return;
     }
 
     setLoading(true);
+    setDotCount(0);
     setError('');
     setHasSearched(true);
 
@@ -59,7 +68,6 @@ function App() {
       const newBatch = data.restaurants || [];
 
       setRawRestaurants(prev => {
-        // Jeśli zmieniono miejscowość/adres – resetujemy listę
         if (isNewLocation || !lastPointRef.current ||
             Math.abs(lastPointRef.current.lat - point.lat) > 0.005 ||
             Math.abs(lastPointRef.current.lon - point.lon) > 0.005) {
@@ -67,7 +75,6 @@ function App() {
           return newBatch;
         }
 
-        // Kumulujemy wyniki: lokale z mniejszego promienia ZAWSZE zostają zachowane!
         const map = new Map();
         for (const r of prev) {
           map.set(r.id || `${r.name}-${r.lat}-${r.lon}`, r);
@@ -85,97 +92,36 @@ function App() {
     }
   }
 
-  // Wyszukanie dania
-  function handleDishSearch(e) {
-    if (e) e.preventDefault();
-    const query = (dishInput || '').trim();
-    if (!query) {
-      setError('Wpisz nazwę dania, którego szukasz.');
-      return;
-    }
-
-    setActiveDish(query);
-
-    if (origin) {
-      fetchNearby(origin, radius);
-    } else {
-      if (navigator.geolocation) {
-        setLoading(true);
-        navigator.geolocation.getCurrentPosition(
-          pos => {
-            const point = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-            setOrigin(point);
-            setLocationName('Twoja bieżąca lokalizacja GPS');
-            fetchNearby(point, radius, true);
-          },
-          () => {
-            setLoading(false);
-            setError('Podaj miejscowość lub adres w panelu poniżej.');
-            setManualOpen(true);
-          },
-          { timeout: 8000 }
-        );
-      } else {
-        setError('Podaj miejscowość lub adres poniżej, aby wyszukać restauracje.');
-        setManualOpen(true);
-      }
-    }
-  }
-
-  // Kliknięcie szybkiej pigułki potrawy
-  function selectQuickDish(dish) {
-    setDishInput(dish.name);
+  // Wybór potrawy z kafelków
+  function selectDish(dish) {
     setActiveDish(dish.name);
+    setShowAllNearby(false);
     if (origin) {
-      fetchNearby(origin, radius);
+      fetchNearby(origin, radius, dish.name, false);
     } else {
-      setError('Wskaż swoją lokalizację poniżej (GPS, miasto lub adres), aby znaleźć najbliższe lokale.');
+      setError('Podaj adres lub miejscowość w polu poniżej, aby wyszukać restauracje.');
     }
   }
 
-  // Pobranie pozycji z GPS przeglądarki
-  function locate() {
-    if (!navigator.geolocation) {
-      setError('Twoja przeglądarka nie obsługuje geolokalizacji.');
-      return;
-    }
-    setLoading(true);
-    setError('');
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        const point = { lat: pos.coords.latitude, lon: pos.coords.longitude };
-        setOrigin(point);
-        setLocationName('Twoja bieżąca lokalizacja GPS');
-        setManualOpen(false);
-        setAddressOpen(false);
-        const query = dishInput.trim() || 'carbonara';
-        setActiveDish(query);
-        fetchNearby(point, radius, true);
-      },
-      () => {
-        setLoading(false);
-        setError('Nie udało się ustalić pozycji GPS. Wpisz miejscowość lub adres ręcznie.');
-      },
-      { timeout: 10000, maximumAge: 60000 }
-    );
-  }
-
-  // Zmiana promienia (2, 5, 10, 15 km)
+  // Zmiana promienia
   function handleRadiusChange(newRadius) {
     setRadius(newRadius);
     if (origin && hasSearched) {
-      fetchNearby(origin, newRadius, false);
+      fetchNearby(origin, newRadius, activeDish, false);
     }
   }
 
-  // Kwalifikowanie restauracji pod kątem dania ze ścisłym filtrem promienia
+  // Wszystkie lokale w zadanym promieniu
+  const allInRadius = useMemo(() => {
+    return rawRestaurants.filter(r => r.distance <= radius);
+  }, [rawRestaurants, radius]);
+
+  // Kwalifikowanie restauracji pod kątem potrawy
   const matchedRestaurants = useMemo(() => {
     if (!hasSearched) return [];
     const qualified = [];
-    for (const r of rawRestaurants) {
-      // Żelazny filtr promienia
-      if (r.distance > radius) continue;
 
+    for (const r of allInRadius) {
       const item = qualifyRestaurantForDish(r, dishAnalysis);
       if (item) {
         qualified.push(item);
@@ -188,7 +134,15 @@ function App() {
       }
       return a.distance - b.distance;
     });
-  }, [rawRestaurants, dishAnalysis, hasSearched, radius]);
+  }, [allInRadius, dishAnalysis, hasSearched]);
+
+  // Lista wyświetlana
+  const displayedRestaurants = useMemo(() => {
+    if (showAllNearby) {
+      return allInRadius;
+    }
+    return matchedRestaurants;
+  }, [showAllNearby, allInRadius, matchedRestaurants]);
 
   return (
     <>
@@ -196,46 +150,26 @@ function App() {
         <a className="logo" href="./">
           Gdzie<span>Zjem?</span>
         </a>
-        <span className="badge">WYSZUKIWARKA DAŃ NA ŻYWO (LIVE OSM)</span>
+        <span className="badge">WYSZUKIWARKA DAŃ</span>
       </header>
 
       <main>
-        {/* Sekcja Hero z formularzem wyszukiwania */}
+        {/* Sekcja Hero */}
         <section className="hero">
-          <div className="eyebrow">ZNAJDŹ SWOJE ULUBIONE DANIE W OKOLICY</div>
+          <div className="eyebrow">WYBIERZ DANIE I ZNAJDŹ NAJBLIŻSZY LOKAL</div>
           <h1>
             Gdzie dziś zjesz<br />
-            <em>{activeDish ? activeDish : (dishInput ? dishInput : 'coś pysznego')}?</em>
+            <em>{activeDish ? activeDish : 'coś pysznego'}?</em>
           </h1>
-          <p>
-            Wpisz konkretne danie (np. carbonara, ramen, burger, schabowy, pizza),
-            a aplikacja na żywo znajdzie najbliższe restauracje w wybranym promieniu.
-          </p>
 
-          {/* Główny formularz wyszukiwarki dań */}
-          <form className="searchbox" onSubmit={handleDishSearch} role="search">
-            <span aria-hidden="true">{dishAnalysis?.cuisine?.emoji || '🍽️'}</span>
-            <input
-              type="text"
-              value={dishInput}
-              onChange={e => setDishInput(e.target.value)}
-              placeholder="Wpisz danie, np. carbonara, ramen, burger, pierogi..."
-              aria-label="Nazwa potrawy"
-            />
-            <button type="submit" disabled={loading}>
-              {loading ? 'Szukam…' : 'Znajdź danie 🔍'}
-            </button>
-          </form>
-
-          {/* Szybki wybór popularnych potraw */}
-          <div className="suggestions">
-            <span>Szybki wybór:</span>
+          {/* Kafelki wyboru potraw (bez etykiety 'Szybki wybór' i bez inputu) */}
+          <div className="suggestions" style={{ marginTop: '14px' }}>
             {POPULAR_DISHES.map(d => (
               <button
                 key={d.query}
                 type="button"
-                className={activeDish.toLowerCase() === d.query ? 'selected-dish-chip' : ''}
-                onClick={() => selectQuickDish(d)}
+                className={activeDish.toLowerCase() === d.name.toLowerCase() ? 'selected-dish-chip' : ''}
+                onClick={() => selectDish(d)}
                 disabled={loading}
               >
                 {d.emoji} {d.name}
@@ -243,67 +177,19 @@ function App() {
             ))}
           </div>
 
-          {/* Panel wyboru lokalizacji */}
-          <div className="location-panel" style={{ marginTop: '28px' }}>
-            <div>
-              <strong>⌖ Lokalizacja wyszukiwania</strong>
-              <p role="status">
-                {locationName ? locationName : 'Lokalizacja nieustalona – kliknij przycisk obok'}
-              </p>
-              <small>Promień: {radius} km · Wyniki na żywo</small>
-            </div>
-            <div className="location-actions">
-              <button type="button" disabled={loading} onClick={locate} title="Pobierz z GPS">
-                📍 Użyj GPS
-              </button>
-              <button
-                type="button"
-                aria-expanded={manualOpen}
-                disabled={loading}
-                onClick={() => { setManualOpen(!manualOpen); setAddressOpen(false); }}
-              >
-                🏙️ Podaj miejscowość
-              </button>
-              <button
-                type="button"
-                aria-expanded={addressOpen}
-                disabled={loading}
-                onClick={() => { setAddressOpen(!addressOpen); setManualOpen(false); }}
-              >
-                🏠 Podaj dokładny adres
-              </button>
-            </div>
-          </div>
+          {/* Samodzielny input dokładnego adresu (bez przycisków otwierających) */}
+          <AddressLocation
+            disabled={loading}
+            selectedLabel={locationName}
+            onSelect={(point, label) => {
+              setOrigin(point);
+              setLocationName(label);
+              fetchNearby(point, radius, activeDish, true);
+            }}
+          />
 
-          {manualOpen && (
-            <ManualLocation
-              disabled={loading}
-              onSelect={(point, label) => {
-                setManualOpen(false);
-                setOrigin(point);
-                setLocationName(label);
-                const query = dishInput.trim() || 'carbonara';
-                setActiveDish(query);
-                fetchNearby(point, radius, true);
-              }}
-            />
-          )}
-
-          {addressOpen && (
-            <AddressLocation
-              disabled={loading}
-              onSelect={(point, label) => {
-                setAddressOpen(false);
-                setOrigin(point);
-                setLocationName(label);
-                const query = dishInput.trim() || 'carbonara';
-                setActiveDish(query);
-                fetchNearby(point, radius, true);
-              }}
-            />
-          )}
-
-          <div className="radius-picker">
+          {/* Wybór promienia */}
+          <div className="radius-picker" style={{ marginTop: '20px' }}>
             <span>Promień wyszukiwania:</span>
             <div>
               {[2, 5, 10, 15].map(n => (
@@ -332,18 +218,41 @@ function App() {
               <h2>
                 {hasSearched
                   ? <>Miejsca serwujące: <span style={{ color: '#eb714b' }}>{activeDish}</span></>
-                  : 'Wyszukaj danie powyżej'}
+                  : 'Wybierz danie i podaj adres'}
               </h2>
             </div>
+
             {hasSearched && (
-              <span className="location">{matchedRestaurants.length} znalezionych w promieniu {radius} km</span>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  className={`filter-match-toggle ${!showAllNearby ? 'active' : ''}`}
+                  onClick={() => setShowAllNearby(false)}
+                >
+                  🎯 Tylko {activeDish} ({matchedRestaurants.length})
+                </button>
+                <button
+                  type="button"
+                  className={`filter-match-toggle ${showAllNearby ? 'active' : ''}`}
+                  onClick={() => setShowAllNearby(true)}
+                  title="Pokaż wszystkie lokale w okolicy"
+                >
+                  🌐 Wszystkie w promieniu ({allInRadius.length})
+                </button>
+              </div>
             )}
           </div>
 
+          {/* Mini animacja ładowania z pulsującą ikonką i dynamicznymi kropkami */}
           {loading && (
-            <div className="empty">
-              <h3>🔍 Szukam restauracji na mapie…</h3>
-              <p>Pobieram lokale w promieniu do {radius} km od: {locationName}</p>
+            <div className="empty loading-box">
+              <div className="search-pulse-icon" aria-hidden="true">
+                {dishAnalysis?.cuisine?.emoji || '🍽️'}
+              </div>
+              <h3 className="loading-dots-title">
+                Szukam lokali<span className="animated-dots">{animatedDots}</span>
+              </h3>
+              <p>Szukam {activeDish} w promieniu do {radius} km od: {locationName}</p>
             </div>
           )}
 
@@ -357,22 +266,20 @@ function App() {
           {!loading && !hasSearched && (
             <div className="empty" style={{ padding: '48px 24px' }}>
               <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>🍽️</span>
-              <h3>Wpisz danie i wskaż lokalizację</h3>
+              <h3>Wybierz danie powyżej i wpisz adres</h3>
               <p style={{ maxWidth: '560px', margin: 'auto' }}>
-                Wpisz w polu powyżej potrawę (np. <strong>carbonara</strong>, <strong>ramen</strong>, <strong>burger</strong>, <strong>schabowy</strong>)
-                oraz kliknij <strong>Użyj GPS</strong>, <strong>Podaj miejscowość</strong> lub <strong>Podaj adres</strong>,
-                aby na żywo znaleźć najbliższe restauracje.
+                Kliknij potrawę (np. <strong>Carbonara</strong>, <strong>Pizza</strong>, <strong>Ramen</strong>, <strong>Burger</strong>)
+                oraz wpisz ulicę i miasto w polu adresu, aby znaleźć najbliższe restauracje.
               </p>
             </div>
           )}
 
-          {/* Lista znalezionych restauracji (wyłącznie w zadanym promieniu) */}
-          {!loading && hasSearched && matchedRestaurants.length > 0 && (
+          {/* Lista restauracji */}
+          {!loading && hasSearched && displayedRestaurants.length > 0 && (
             <div className="restaurant-list">
-              {matchedRestaurants.map((r, i) => {
+              {displayedRestaurants.map((r, i) => {
                 const isNearest = i === 0;
-                const targetDish = activeDish || dishInput;
-                const gmapsQuery = `${targetDish} ${r.name} ${r.address}`;
+                const gmapsQuery = `${activeDish} ${r.name} ${r.address}`;
                 const gmapsDishUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(gmapsQuery)}`;
                 const gmapsNavUrl = `https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lon}`;
 
@@ -388,7 +295,7 @@ function App() {
                     <div className="restaurant-content">
                       <div className="restaurant-top">
                         <span className="eyebrow highlight-badge">
-                          {isNearest ? '🏆 NAJBLIŻEJ CIEBIE' : (r.matchBadge || 'RESTAURACJA W OKOLICY')}
+                          {isNearest ? '🏆 NAJBLIŻEJ CIEBIE' : (r.matchBadge || 'LOKAL W OKOLICY')}
                         </span>
                         <div>
                           <strong>
@@ -405,7 +312,7 @@ function App() {
                       <h3>{r.name}</h3>
                       <p className="address">📍 {r.address}</p>
 
-                      {/* Boks konkretnego dania */}
+                      {/* Boks dania */}
                       {r.dishItem && (
                         <div className="dish-showcase">
                           <div className="dish-header">
@@ -427,7 +334,7 @@ function App() {
 
                       <div className="dish-match-box">
                         <span className="dish-reason">
-                          ℹ️ {r.matchReason}
+                          ℹ️ {r.matchReason || (r.cuisine ? `Profil kuchni: ${r.cuisine}` : 'Lokal w Twojej okolicy')}
                         </span>
                       </div>
 
@@ -440,7 +347,7 @@ function App() {
                           className="action-btn menu-btn"
                           title="Sprawdź recenzje, zdjęcia i menu w Google Maps"
                         >
-                          📖 Sprawdź "{targetDish}" w menu Google ↗
+                          📖 Sprawdź "{activeDish}" w Google Maps ↗
                         </a>
                         <a
                           href={gmapsNavUrl}
@@ -457,7 +364,7 @@ function App() {
                             target="_blank"
                             rel="noreferrer"
                             className="action-btn web-btn"
-                            title="Otwórz stronę lokalu"
+                            title="Otwórz oficjalną stronę lokalu"
                           >
                             🌐 Strona WWW
                           </a>
@@ -471,14 +378,20 @@ function App() {
           )}
 
           {/* Komunikat o braku wyników w zadanym promieniu */}
-          {!loading && hasSearched && matchedRestaurants.length === 0 && (
+          {!loading && hasSearched && displayedRestaurants.length === 0 && (
             <div className="empty">
-              <h3>Brak lokali serwujących "{activeDish || dishInput}" w promieniu {radius} km</h3>
+              <h3>Brak lokali serwujących "{activeDish}" w promieniu {radius} km</h3>
               <p>
-                W wybranym obszarze do {radius} km wokół "{locationName}" nie znaleziono lokali o tym profilu kuchni.
-                Zwiększ promień na 10 km lub 15 km, albo wskaż inne miasto.
+                W wybranym obszarze do {radius} km wokół "{locationName}" nie znaleziono lokali o profilu pasującym do tego dania.
               </p>
-              <div style={{ marginTop: '16px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              {allInRadius.length > 0 && (
+                <div style={{ marginTop: '16px' }}>
+                  <button type="button" onClick={() => setShowAllNearby(true)}>
+                    Pokaż wszystkie restauracje w okolicy ({allInRadius.length})
+                  </button>
+                </div>
+              )}
+              <div style={{ marginTop: '12px', display: 'flex', gap: '10px', justifyContent: 'center' }}>
                 <button type="button" onClick={() => handleRadiusChange(10)}>
                   Rozszerz promień do 10 km
                 </button>
@@ -490,7 +403,7 @@ function App() {
           )}
 
           <p className="map-credit">
-            Dane lokali i współrzędne: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>. Wyszukiwanie w 100% na żywo.
+            Dane mapowe i współrzędne: <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>.
           </p>
         </section>
       </main>

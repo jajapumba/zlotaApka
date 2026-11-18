@@ -5,22 +5,21 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const overpassEndpoints = [
   'https://overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter',
-  'https://lz4.overpass-api.de/api/interpreter'
+  'https://lz4.overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter'
 ];
 
 /**
- * Zapytanie do Overpass API bez sztucznego ucinania węzłów,
- * dzięki czemu nie gubimy najbliższych lokali przy większych promieniach!
+ * Zapytanie do Overpass API pobierające 100% lokali gastronomicznych (node + way),
+ * w tym lokale oznaczone jako restaurant, fast_food, bistro, bar, pub i cafe.
  */
-async function fetchOverpassNodes(lat, lon, radiusKm) {
-  // Pobieramy punkty node z tagami - węzły są bardzo lekkie i zwracają się natychmiast
-  const query = `[out:json][timeout:15];node[amenity~"restaurant|fast_food|bar|bistro"](around:${radiusKm * 1000},${lat},${lon});out tags;`;
+async function fetchOverpassAll(lat, lon, radiusKm) {
+  const query = `[out:json][timeout:20];(node[amenity~"restaurant|fast_food|bar|bistro|pub|cafe"](around:${radiusKm * 1000},${lat},${lon});way[amenity~"restaurant|fast_food|bar|bistro|pub|cafe"](around:${radiusKm * 1000},${lat},${lon}););out center tags;`;
 
   let lastErr = null;
   for (const endpoint of overpassEndpoints) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -50,7 +49,7 @@ async function fetchOverpassNodes(lat, lon, radiusKm) {
 }
 
 /**
- * Fallback Nominatim z powiększonym limitem wyników w zadanym viewbox
+ * Fallback Nominatim z viewbox
  */
 async function fetchNominatimRestaurants(lat, lon, radiusKm) {
   const deltaLat = (radiusKm * 1.05) / 111.1;
@@ -61,7 +60,7 @@ async function fetchNominatimRestaurants(lat, lon, radiusKm) {
   const maxLon = (lon + deltaLon).toFixed(5);
   const minLat = (lat - deltaLat).toFixed(5);
 
-  const url = `https://nominatim.openstreetmap.org/search?amenity=restaurant&format=json&viewbox=${minLon},${maxLat},${maxLon},${minLat}&bounded=1&limit=100`;
+  const url = `https://nominatim.openstreetmap.org/search?amenity=restaurant&format=json&viewbox=${minLon},${maxLat},${maxLon},${minLat}&bounded=1&limit=150`;
 
   const response = await fetch(url, {
     headers: {
@@ -87,6 +86,7 @@ async function fetchNominatimRestaurants(lat, lon, radiusKm) {
 }
 
 function nearbyApi(server) {
+  // Geokoder
   server.middlewares.use('/api/geocode', async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
@@ -149,6 +149,7 @@ function nearbyApi(server) {
     }
   });
 
+  // Główny endpoint pobierania lokali z OpenStreetMap
   server.middlewares.use('/api/nearby', async (req, res) => {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
@@ -170,31 +171,21 @@ function nearbyApi(server) {
       return;
     }
 
-    const key = `${lat.toFixed(3)},${lon.toFixed(3)},${radius}`;
-
     try {
-      const cached = globalThis.__nearbyCache?.get(key);
+      // Krótki odstęp rate-limit dla Overpass
+      const wait = Math.max(0, 400 - (Date.now() - (lastRequest.get('overpass') || 0)));
+      if (wait) await sleep(wait);
+      lastRequest.set('overpass', Date.now());
+
       let rawElements = null;
-
-      if (cached && Date.now() - cached.time < 600000) {
-        rawElements = cached.data;
-      } else {
-        const wait = Math.max(0, 500 - (Date.now() - (lastRequest.get('overpass') || 0)));
-        if (wait) await sleep(wait);
-        lastRequest.set('overpass', Date.now());
-
-        try {
-          rawElements = await fetchOverpassNodes(lat, lon, radius);
-        } catch (overpassErr) {
-          console.warn('Overpass timeout, używam Nominatim viewbox:', overpassErr.message);
-          rawElements = await fetchNominatimRestaurants(lat, lon, radius);
-        }
-
-        globalThis.__nearbyCache ??= new Map();
-        globalThis.__nearbyCache.set(key, { time: Date.now(), data: rawElements });
+      try {
+        rawElements = await fetchOverpassAll(lat, lon, radius);
+      } catch (overpassErr) {
+        console.warn('Overpass timeout, używam Nominatim viewbox:', overpassErr.message);
+        rawElements = await fetchNominatimRestaurants(lat, lon, radius);
       }
 
-      // Mapowanie, przeliczanie odległości i filtr promienia
+      // Mapowanie i przeliczanie dokładnej odległości dla każdego lokalu
       const restaurants = (rawElements || [])
         .map(el => {
           const tags = el.tags || {};
@@ -218,7 +209,8 @@ function nearbyApi(server) {
             fast_food: 'Fast Food',
             food_court: 'Strefa gastronomiczna',
             bar: 'Bar / Bistro',
-            bistro: 'Bistro'
+            bistro: 'Bistro',
+            pub: 'Pub / Bar'
           };
 
           const addressParts = [tags['addr:street'], tags['addr:housenumber'], tags['addr:city']].filter(Boolean);
@@ -234,18 +226,24 @@ function nearbyApi(server) {
             category: categoryNames[tags.amenity] || tags.amenity || 'Gastronomia',
             cuisine: tags.cuisine || tags['diet:vegetarian'] || tags['diet:vegan'] || '',
             phone: tags.phone || tags['contact:phone'] || null,
-            website: tags.website || tags['contact:website'] || null
+            website: tags.website || tags['contact:website'] || null,
+            source: 'osm'
           };
         })
         .filter(r => r.distance <= radius)
         .sort((a, b) => a.distance - b.distance);
 
-      res.end(JSON.stringify({ restaurants, count: restaurants.length }));
+      res.end(JSON.stringify({
+        restaurants,
+        count: restaurants.length,
+        source: 'osm',
+        sourceName: 'OpenStreetMap Live'
+      }));
     } catch (error) {
       console.error('Błąd /api/nearby:', error.message);
       res.statusCode = 502;
       res.end(JSON.stringify({
-        error: 'Serwery map nie odpowiedziały. Spróbuj ponownie lub wybierz inną lokalizację.'
+        error: 'Serwery map nie odpowiedziały. Spróbuj ponownie za moment.'
       }));
     }
   });

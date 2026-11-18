@@ -1,23 +1,33 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
-export default function AddressLocation({ onSelect, disabled }) {
+export default function AddressLocation({ onSelect, disabled, selectedLabel }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('Wpisz ulicę, numer domu lub miejscowość.');
+  const [message, setMessage] = useState('');
+  // Przechowuje tekst ostatnio wybranego adresu — blokuje geocoding dopóki użytkownik nie wpisze czegoś innego
+  const lockedQueryRef = useRef('');
 
   useEffect(() => {
+    // Jeśli query dokładnie pasuje do ostatnio wybranego adresu → nie szukaj ponownie
+    // (dotyczy też przypadku gdy disabled się zmienia podczas ładowania restauracji)
+    if (lockedQueryRef.current && query === lockedQueryRef.current) {
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+
     const controller = new AbortController();
     setResults([]);
 
     if (query.trim().length < 3 || disabled) {
       setLoading(false);
-      setMessage('Wpisz co najmniej 3 znaki adresu (np. ulica i miasto).');
+      setMessage('');
       return () => controller.abort();
     }
 
     setLoading(true);
-    setMessage('Szukam adresu na mapie…');
+    setMessage('');
 
     const timer = setTimeout(async () => {
       try {
@@ -31,17 +41,17 @@ export default function AddressLocation({ onSelect, disabled }) {
         setResults(data || []);
         setMessage(
           data.length > 0
-            ? 'Wybierz właściwy adres z listy:'
-            : 'Nie znaleziono tego adresu. Sprawdź poprawność ulicy i miejscowości.'
+            ? ''
+            : 'Nie znaleziono adresu. Sprawdź nazwę ulicy lub miejscowości.'
         );
       } catch (error) {
         if (!controller.signal.aborted) {
-          setMessage('Nie udało się pobrać adresów. Sprawdź połączenie i spróbuj ponownie.');
+          setMessage('Nie udało się pobrać adresów. Sprawdź połączenie.');
         }
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
-    }, 400);
+    }, 350);
 
     return () => {
       clearTimeout(timer);
@@ -49,30 +59,47 @@ export default function AddressLocation({ onSelect, disabled }) {
     };
   }, [query, disabled]);
 
+  function handlePick(item) {
+    lockedQueryRef.current = item.label; // zablokuj ten tekst — nie szukaj dopóki użytkownik nie zmieni
+    setQuery(item.label);
+    setResults([]);
+    setMessage('');
+    onSelect({ lat: item.lat, lon: item.lon }, item.label);
+  }
+
   return (
-    <div className="manual-location address-location">
-      <label htmlFor="exact-address">Podaj dokładny adres</label>
+    <div className="manual-location address-location" style={{ marginTop: '24px' }}>
+      <label htmlFor="exact-address" style={{ fontSize: '15px', fontWeight: 700, color: '#25372c' }}>
+        📍 Podaj dokładny adres lub miejscowość
+      </label>
       <input
         id="exact-address"
-        autoFocus
         value={query}
         disabled={disabled}
-        onChange={event => setQuery(event.target.value)}
-        placeholder="np. Piotrkowska 100, Łódź lub Rynek 5, Wrocław"
+        onChange={event => {
+          lockedQueryRef.current = ''; // użytkownik pisze ponownie — odblokuj geocoding
+          setQuery(event.target.value);
+        }}
+        placeholder="Wpisz ulicę, miasto lub miejscowość, np. Główny Rynek, Kalisz"
         autoComplete="street-address"
         aria-describedby="address-hint"
         aria-busy={loading}
       />
-      <p id="address-hint" role="status">{message}</p>
+      {selectedLabel && !query && (
+        <small style={{ color: '#304e39', fontWeight: 600, display: 'block', marginTop: '6px' }}>
+          ✓ Aktualnie wybrano: {selectedLabel}
+        </small>
+      )}
+      {message && <p id="address-hint" role="status" style={{ margin: '8px 0 4px', fontSize: '13px' }}>{message}</p>}
 
       {results.length > 0 && (
-        <ul className="place-options">
+        <ul className="place-options" style={{ marginTop: '10px' }}>
           {results.map((item, index) => (
             <li key={`${item.lat}-${item.lon}-${index}`}>
               <button
                 type="button"
                 disabled={disabled}
-                onClick={() => onSelect({ lat: item.lat, lon: item.lon }, item.label)}
+                onClick={() => handlePick(item)}
               >
                 <span className="place-name">
                   <strong>{item.label}</strong>
@@ -84,7 +111,6 @@ export default function AddressLocation({ onSelect, disabled }) {
           ))}
         </ul>
       )}
-      <small>Wybierz wynik z listy, aby wyznaczyć punkt wyszukiwania.</small>
     </div>
   );
 }

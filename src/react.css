@@ -185,3 +185,39 @@
   padding: 3px 8px;
   border-radius: 5px;
 }
+
+
+/* Animacja szukania lokali */
+.loading-box {
+  padding: 42px 24px !important;
+  background: #fbfbf8 !important;
+  border: 1px dashed #d7ded0 !important;
+}
+
+.search-pulse-icon {
+  font-size: 54px;
+  margin-bottom: 14px;
+  display: inline-block;
+  animation: pulseIcon 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes pulseIcon {
+  0% { transform: scale(0.95); opacity: 0.85; }
+  100% { transform: scale(1.12); opacity: 1; }
+}
+
+.loading-dots-title {
+  font-size: 24px;
+  font-family: 'Manrope', sans-serif;
+  color: #25372c;
+  margin: 0 0 8px;
+}
+
+.animated-dots {
+  display: inline-block;
+  min-width: 24px;
+  text-align: left;
+  color: #ec7148;
+  font-weight: 800;
+  letter-spacing: 2px;
+}

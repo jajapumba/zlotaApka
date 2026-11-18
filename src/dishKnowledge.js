@@ -1,6 +1,5 @@
-// Baza wiedzy kulinarnej w czasie rzeczywistym (bez zewnętrznej bazy danych)
-// Pozwala w locie zmapować wpisane przez użytkownika danie (np. "carbonara", "ramen", "kebab")
-// na profil kuchni w OpenStreetMap, synonimy, emoji oraz słowa kluczowe.
+// Baza wiedzy kulinarnej i profilowania potraw
+// Mapuje potrawę na profil kuchni, synonimy, emoji oraz słowa kluczowe.
 
 export const POPULAR_DISHES = [
   { name: 'Carbonara', query: 'carbonara', emoji: '🍝', cuisine: 'italian;pasta', desc: 'Klasyczny makaron po rzymsku (guanciale, jajko, pecorino)' },
