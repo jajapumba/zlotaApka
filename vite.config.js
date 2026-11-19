@@ -4,9 +4,9 @@ const lastRequest = new Map();
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const overpassEndpoints = [
-  'https://overpass-api.de/api/interpreter',
-  'https://lz4.overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter'
+  'https://ovp.dresel.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
+  'https://overpass-api.de/api/interpreter'
 ];
 
 /**

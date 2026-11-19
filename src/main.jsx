@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import AddressLocation from './AddressLocation.jsx';
 import { POPULAR_DISHES } from './dishKnowledge.js';
@@ -22,23 +22,12 @@ function App() {
   const [radius, setRadius] = useState(5);
   const [rawRestaurants, setRawRestaurants] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [dotCount, setDotCount] = useState(0);
   const [error, setError] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
   const [showAllNearby, setShowAllNearby] = useState(false);
 
   const lastPointRef = useRef(null);
 
-  // Animacja kropeczek: 0 -> 1 -> 2 -> 3 -> 0 -> 1 -> 2 -> 3 ...
-  useEffect(() => {
-    if (!loading) return;
-    const interval = setInterval(() => {
-      setDotCount(prev => (prev + 1) % 4);
-    }, 400);
-    return () => clearInterval(interval);
-  }, [loading]);
-
-  const animatedDots = '.'.repeat(dotCount);
 
   // Analiza potrawy w locie
   const dishAnalysis = useMemo(() => analyzeDishQuery(activeDish), [activeDish]);
@@ -51,7 +40,6 @@ function App() {
     }
 
     setLoading(true);
-    setDotCount(0);
     setError('');
     setHasSearched(true);
 
@@ -99,7 +87,6 @@ function App() {
     if (origin) {
       fetchNearby(origin, radius, dish.name, false);
     } else {
-      setError('Podaj adres lub miejscowość w polu poniżej, aby wyszukać restauracje.');
     }
   }
 
@@ -250,7 +237,7 @@ function App() {
                 {dishAnalysis?.cuisine?.emoji || '🍽️'}
               </div>
               <h3 className="loading-dots-title">
-                Szukam lokali<span className="animated-dots">{animatedDots}</span>
+                Szukam lokali<span className="animated-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span>
               </h3>
               <p>Szukam {activeDish} w promieniu do {radius} km od: {locationName}</p>
             </div>
@@ -412,3 +399,4 @@ function App() {
 }
 
 createRoot(document.getElementById('root')).render(<App />);
+
